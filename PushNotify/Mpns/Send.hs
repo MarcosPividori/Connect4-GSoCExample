@@ -20,7 +20,7 @@ import Control.Concurrent.Async
 import Control.Monad.IO.Class       (liftIO)
 import Control.Monad.Trans.Control  (MonadBaseControl)
 import Control.Monad.Trans.Resource (MonadResource,runResourceT)
-import Control.Retry
+import Contrl.Retry
 import Network.HTTP.Types
 import Network.TLS.Extra            (fileReadCertificate,fileReadPrivateKey)
 import Network.HTTP.Conduit         (http, parseUrl, withManager, RequestBody (RequestBodyLBS),
