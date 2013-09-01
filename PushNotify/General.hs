@@ -13,7 +13,7 @@ module PushNotify.General
     , PushServiceConfig(..)
     , RegisterResult(..)
     , PushAppConfig(..)
-    , PushManager
+    , PushManager(..)
     -- * Push Message
     , PushNotification(..)
     -- * Push Result
