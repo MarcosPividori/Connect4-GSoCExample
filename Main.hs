@@ -61,7 +61,22 @@ mkYesod "Messages" [parseRoutes|
 -- Instances:
 
 instance Yesod Messages where
-    approot = ApprootMaster theApproot
+    approot = ApprootStatic "http://192.168.0.52:3000" -- Here you must complete with the correct route.
+    defaultLayout widget = do
+        pc <- widgetToPageContent $ do
+            addStylesheetRemote "//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css"
+            widget
+        base <- widgetToPageContent ($(widgetFile "base"))
+        hamletToRepHtml [hamlet|
+$doctype 5
+<html>
+    <head>
+        ^{pageHead base}
+        ^{pageHead pc}
+    <body>
+        ^{pageBody base}
+        ^{pageBody pc}
+|]
 
 instance YesodAuth Messages where
     type AuthId Messages = Text

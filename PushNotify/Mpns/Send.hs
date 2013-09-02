@@ -16,7 +16,6 @@ import Data.Text                    (Text, pack, unpack, empty)
 import Data.Text.Encoding           (decodeUtf8)
 import Text.XML
 import qualified Control.Exception  as CE
-import Control.Concurrent.Async
 import Control.Monad.IO.Class       (liftIO)
 import Control.Monad.Trans.Control  (MonadBaseControl)
 import Control.Monad.Trans.Resource (MonadResource,runResourceT)
@@ -36,8 +35,7 @@ retrySettingsMPNS = RetrySettings {
 -- | 'sendMPNS' sends the message through a MPNS Server.
 sendMPNS :: Manager -> MPNSAppConfig -> MPNSmessage -> IO MPNSresult
 sendMPNS manager cnfg msg = do
-                        asyncs  <- mapM (async . send manager cnfg msg) $ deviceURIs msg
-                        results <- mapM waitCatch asyncs
+                        results  <- mapM (\uri -> CE.catch (send manager cnfg msg uri >>= return . Right) (\e -> let _ = e:: CE.SomeException in return $ Left e)) $ deviceURIs msg
                         let l   = zip (deviceURIs msg) results
                             res = map (\(x,Right y) -> (x,y)) $ filter (isRight . snd) l
                         return $ MPNSresult{
