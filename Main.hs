@@ -26,6 +26,7 @@ import Import
 import Connect4
 import qualified Data.Array  as DA
 import Extra
+import System.Environment (getEnv)
 
 -- Yesod App:
 
@@ -36,6 +37,7 @@ data Messages = Messages {
                          ,  getStatic      :: Static         -- Reference point of the static data.
                          ,  manager        :: PushManager
                          ,  pushAppSub     :: PushAppSub
+                         ,  theApproot     :: Text
                          }
 
 readMaybe :: (Read a) => String -> Maybe a
@@ -59,7 +61,7 @@ mkYesod "Messages" [parseRoutes|
 -- Instances:
 
 instance Yesod Messages where
-    approot = ApprootStatic "" -- Here you must complete with the correct route.
+    approot = ApprootMaster theApproot
 
 instance YesodAuth Messages where
     type AuthId Messages = Text
@@ -76,7 +78,7 @@ instance YesodAuth Messages where
 instance YesodPersist Messages where
     type YesodPersistBackend Messages = SqlPersistT
     runDB action = do
-        Messages pool _ _ _ <- getYesod
+        Messages pool _ _ _ _ <- getYesod
         runSqlPool action pool
 
 instance RenderMessage Messages FormMessage where
@@ -94,7 +96,7 @@ getFromWebR msg = do
                                      case res of
                                        Nothing -> return ()
                                        Just a  -> do
-                                                    Messages pool _ man _ <- getYesod
+                                                    Messages pool _ man _ _ <- getYesod
                                                     liftIO $ handleMessage pool man (devicesIdentifier (entityVal a)) user1 msg
                     redirect RootR
 
@@ -141,7 +143,8 @@ getGetUsersR = do
 
 main :: IO ()
 main = do
-  runResourceT . runNoLoggingT $ withSqlitePool "DevicesDateBase.db3" 10 $ \pool -> do
+  ar <- getEnv "APPROOT"
+  runResourceT . runNoLoggingT $ withSqlitePool "DevicesDateBase.db3" 1 $ \pool -> do
     runSqlPool (runMigration migrateAll) pool
     liftIO $ do
       ref <- newIORef Nothing
@@ -160,5 +163,5 @@ main = do
         }
       writeIORef ref $ Just man
       static@(Static settings) <- static "static"
-      warp 3000 $ Messages pool static man pSub
+      warpEnv $ Messages pool static man pSub $ pack ar
 
