@@ -1,3 +1,4 @@
+<meta http-equiv="refresh" content="5" >
 $maybe _ <- maid
  <p><b>Your current auth ID:</b> #{show maid} <a href=@{AuthR LogoutR}>Logout</a>
  <p> <b>Select a User to start a new game:</b>
