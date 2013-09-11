@@ -1,5 +1,7 @@
+-- GSoC 2013 - Communicating with mobile devices.
 {-# LANGUAGE OverloadedStrings, TypeFamilies, TemplateHaskell, QuasiQuotes, FlexibleContexts, GADTs #-}
              
+-- This module defines the DB structure.
 module DataBase where
 
 import Yesod
@@ -14,7 +16,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 Devices
     user Text
     password Text
-    identifier Identifier
+    identifier Device
     UniqueUser user
     UniqueDevice identifier
     deriving Show

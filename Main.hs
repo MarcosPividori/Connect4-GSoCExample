@@ -1,6 +1,8 @@
+-- GSoC 2013 - Communicating with mobile devices.
+
 -- Test Example for Push Notifications.
 -- This is a simple example of a Yesod server, where devices can register
--- and play the multiplayer "Connect 4" game.
+-- and play the multiplayer "Connect 4" game, and send/receive messages.
 
 {-# LANGUAGE OverloadedStrings, TypeFamilies, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses #-}
 
@@ -14,19 +16,26 @@ import Yesod.Auth.GoogleEmail
 import Database.Persist.Sqlite
 import Data.Default
 import Data.IORef
-import Data.List                      ((\\))
-import Data.Text                      (Text,pack,unpack,empty)
+import Data.List                        ((\\))
+import Data.Text                        (Text,pack,unpack,empty)
+import Data.Time.Clock.POSIX
+import qualified Data.Array             as DA
+import Control.Concurrent
+import Control.Concurrent.Chan          (Chan, newChan)
 import Control.Monad.Logger
-import Control.Monad.Trans.Resource   (runResourceT)
+import Control.Monad.Trans.Resource     (runResourceT)
 import PushNotify.Gcm
 import PushNotify.General
+import PushNotify.General.Types 
+import Network.Wai.EventSource          (eventSourceAppChan)
+import System.Environment               (getEnv)
+import Connect4
+import CommWebUsers
+import CommDevices
 import DataBase
+import Extra
 import Handlers
 import Import
-import Connect4
-import qualified Data.Array  as DA
-import Extra
-import System.Environment (getEnv)
 
 -- Yesod App:
 
@@ -37,6 +46,7 @@ data Messages = Messages {
                          ,  getStatic      :: Static         -- Reference point of the static data.
                          ,  manager        :: PushManager
                          ,  pushAppSub     :: PushAppSub
+                         ,  onlineUsers    :: IORef WebUsers
                          ,  theApproot     :: Text
                          }
 
@@ -44,14 +54,11 @@ readMaybe :: (Read a) => String -> Maybe a
 readMaybe s = case reads s of
               [(x, "")] -> Just x
               _ -> Nothing
-              
-instance PathPiece MsgFromDevice where
-    fromPathPiece t = readMaybe $ unpack t
-    toPathPiece m   = pack $ show m
 
 mkYesod "Messages" [parseRoutes|
 / RootR GET
-/fromweb/#MsgFromDevice FromWebR GET
+/fromweb FromWebR POST
+/receive ReceiveR GET
 /fromdevices PushAppSubR PushAppSub pushAppSub
 /getusers GetUsersR GET
 /static StaticR Static getStatic
@@ -61,21 +68,26 @@ mkYesod "Messages" [parseRoutes|
 -- Instances:
 
 instance Yesod Messages where
-    approot = ApprootStatic "http://192.168.0.52:3000" -- Here you must complete with the correct route.
+    approot = ApprootMaster theApproot
     defaultLayout widget = do
         pc <- widgetToPageContent $ do
-            addStylesheetRemote "//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css"
             widget
         base <- widgetToPageContent ($(widgetFile "base"))
-        hamletToRepHtml [hamlet|
+        giveUrlRenderer [hamlet|
 $doctype 5
 <html>
     <head>
         ^{pageHead base}
         ^{pageHead pc}
     <body>
-        ^{pageBody base}
-        ^{pageBody pc}
+        <div id="main">
+            ^{pageBody base}
+            ^{pageBody pc}
+        <div id="footer">
+           <div id="source">
+             Source code available on <a href="https://github.com/MarcosPividori/Connect4-GSoCExample"><b>GitHub</b></a>
+           <div id="deployment">
+             Deployed on <a href="https://www.fpcomplete.com/"><b>FPComplete</b></a>
 |]
 
 instance YesodAuth Messages where
@@ -93,90 +105,151 @@ instance YesodAuth Messages where
 instance YesodPersist Messages where
     type YesodPersistBackend Messages = SqlPersistT
     runDB action = do
-        Messages pool _ _ _ _ <- getYesod
+        Messages pool _ _ _ _ _ <- getYesod
         runSqlPool action pool
 
 instance RenderMessage Messages FormMessage where
     renderMessage _ _ = defaultFormMessage
 
 -- Handlers:
-              
-getFromWebR :: MsgFromDevice -> Handler Html
-getFromWebR msg = do
-                    maid <- maybeAuthId
-                    case maid of
-                     Nothing    -> return ()
-                     Just user1 -> do
-                                     res <- runDB $ getBy $ UniqueUser user1
-                                     case res of
-                                       Nothing -> return ()
-                                       Just a  -> do
-                                                    Messages pool _ man _ _ <- getYesod
-                                                    liftIO $ handleMessage pool man (devicesIdentifier (entityVal a)) user1 msg
-                    redirect RootR
 
+-- This function actualizes the time of the last communication with a web user.
+actualize :: Text -> Handler WebUsers
+actualize user1 = do
+    Messages _ _ _ _ webUsers _ <- getYesod
+    ctime <- liftIO $ getPOSIXTime
+    liftIO $ atomicModifyIORef webUsers (\s -> 
+        case getClient user1 s of
+          Just (c,_) -> let s' = addClient user1 c ctime s in (s',s')
+          _          -> (s,s)  )
+
+-- 'postFromWebR' receives messages from the website user. (POST messages to '/fromweb')
+postFromWebR :: Handler ()
+postFromWebR = do
+    maid <- maybeAuthId
+    case maid of
+      Nothing    -> redirect $ AuthR LoginR
+      Just user1 -> do
+          Messages pool _ man _ _ _ <- getYesod
+          list <- actualize user1
+          case getClient user1 list of
+            Nothing      -> redirect $ AuthR LoginR
+            Just (id1,_) -> do
+                m <- runInputGet $ iopt textField "message"
+                liftIO $ putStrLn $ "New Message : " ++ show m
+                case m >>= readMaybe . unpack of
+                  Just msg -> liftIO $ do
+                                         liftIO $ putStrLn $ "New parsed Message : " ++ show msg
+                                         handleMessage pool list man (Web id1) user1 msg
+                  _ -> return ()
+                redirect RootR
+
+-- 'getReceiveR' establishes configurations to enable Server-sent events to the website user. (GET messages to '/receive')
+getReceiveR :: Handler ()
+getReceiveR = do
+    maid <- maybeAuthId
+    case maid of
+      Nothing    -> return ()
+      Just user1 -> do
+          Messages _ _ _ _ webUsers _ <- getYesod
+          chan <- liftIO $ newChan
+          ctime <- liftIO $ getPOSIXTime
+          liftIO $ atomicModifyIORef webUsers (\s ->
+               let s' = addClient user1 chan ctime s
+               in (s', s') )
+          req <- waiRequest
+          res <- liftResourceT $ eventSourceAppChan chan req
+          sendWaiResponse res
+
+-- 'getRootR' provides the main page.
 getRootR :: Handler Html
 getRootR = do
-                maid <- maybeAuthId
-                case maid of
-                  Just user1 -> do
-                              reg <- runDB $ getBy $ UniqueUser user1
-                              case reg of
-                                Nothing -> (runDB $ insert $ Devices user1 "nothing" $ Web user1) >> return ()
-                                Just _  -> return ()
-                              g1 <- runDB $ getBy $ UniqueUser1 user1
-                              g2 <- runDB $ getBy $ UniqueUser2 user1
-                              let g = case g1 of
-                                        Nothing -> g2
-                                        _       -> g1
-                              case g of
-                                Just g -> do
-                                   let rows = map (\i -> (map (\j -> (j,(DA.!) (gamesMatrix(entityVal g)) (i,j))) [0..6])) [0..5]
-                                       minusone = (-1)
-                                       user2 = case gamesUser1 (entityVal g) == user1 of
-                                              True  -> gamesUser2 (entityVal g)
-                                              False -> gamesUser1 (entityVal g)
-                                       turn = gamesTurn (entityVal g)
-                                   defaultLayout $(widgetFile "Home")
-                                _      -> do
-                                   list <- getFreelist
-                                   let freeList = list \\ [user1]
-                                   defaultLayout $(widgetFile "SelectUser")                                            
-                  _ -> redirect $ AuthR LoginR
+    maid <- maybeAuthId
+    case maid of
+      Nothing -> redirect $ AuthR LoginR
+      Just user1 -> do
+          g1 <- runDB $ getBy $ UniqueUser1 user1
+          g2 <- runDB $ getBy $ UniqueUser2 user1
+          let (game,numUser) = case g1 of
+                                 Nothing -> (g2,-1)
+                                 _       -> (g1,1)
+          case game of
+            Just g  -> do
+                let list = concat $ map (\i -> map (\j -> (DA.!) (gamesMatrix(entityVal g)) (i,j)) [0..6]) [0..5]
+                    user2 = case gamesUser1 (entityVal g) == user1 of
+                              True  -> gamesUser2 (entityVal g)
+                              False -> gamesUser1 (entityVal g)
+                    turn = gamesTurn (entityVal g)
+                    jsonData = object [ "grid"    .= array list , "numUser" .= show numUser , "user2" .= user2
+                                      , "playing" .= True       , "turn"    .= turn         , "user1" .= user1 ]
+                defaultLayout $(widgetFile "Home")
+            Nothing -> do
+                let jsonData = object ["playing" .= False , "user1" .= user1 ]
+                defaultLayout $(widgetFile "Home")
 
-getFreelist :: Handler [Text]
+getFreelist :: Handler ([Text],[Text])
 getFreelist = do
-                  list  <- (runDB $ selectList [] [Desc DevicesUser]) >>= return . map (\a -> devicesUser(entityVal a))
-                  list2 <- (runDB $ selectList [] [Desc GamesUser1])  >>= return . map (\a -> gamesUser1(entityVal a))
-                  list3 <- (runDB $ selectList [] [Desc GamesUser2])  >>= return . map (\a -> gamesUser2(entityVal a))
-                  return $ (list \\ list2) \\ list3
+    list  <- (runDB $ selectList [] [Desc DevicesUser]) >>= return . map (\a -> devicesUser(entityVal a))
+    Messages _ _ _ _ refUsers _ <- getYesod
+    l <- liftIO $ readIORef refUsers
+    let list1 = getClients l
+    list2 <- (runDB $ selectList [] [Desc GamesUser1]) >>= return . map (\a -> gamesUser1(entityVal a))
+    list3 <- (runDB $ selectList [] [Desc GamesUser2]) >>= return . map (\a -> gamesUser2(entityVal a))
+    let all = list ++ list1
+    return $ (((all \\ list2) \\ list3),all)
 
+-- 'getGetUsersR' provides the list of users that are available to play ("users"), and the complete list ("all").
 getGetUsersR :: Handler RepJson
 getGetUsersR = do
-                  freeList <- getFreelist
-                  sendResponse $ toTypedContent $ object ["users" .= array freeList ]
+    maid <- maybeAuthId
+    case maid of
+      Just user1 -> actualize user1 >> return ()
+      Nothing -> return () 
+    (freeList,all) <- getFreelist
+    sendResponse $ toTypedContent $ object ["users" .= array freeList , "all" .= array all]
 
 main :: IO ()
 main = do
-  ar <- getEnv "APPROOT"
-  runResourceT . runNoLoggingT $ withSqlitePool "DevicesDateBase.db3" 1 $ \pool -> do
-    runSqlPool (runMigration migrateAll) pool
-    liftIO $ do
+    ar <- getEnv "APPROOT"
+    runResourceT . runNoLoggingT $ withSqlitePool "DevicesDateBase.db3" 10 $ \pool -> do
+     runSqlPool (runMigration migrateAll) pool
+     liftIO $ do
       ref <- newIORef Nothing
+      onlineUsers <- newIORef newWebUsersState
       (man,pSub) <- startPushService $ PushServiceConfig{
             pushConfig           = def{
                                        gcmAppConfig  = Just $ GCMAppConfig 
-                                                              "" 
-                                                              ""  
+                                                              ""
+                                                              ""
                                                               5 
                                    ,   mpnsAppConfig = Just def
                                    }
-        ,   newMessageCallback   = handleNewMessage pool ref
+        ,   newMessageCallback   = handleNewMessage pool onlineUsers ref
         ,   newDeviceCallback    = handleNewDevice pool
         ,   unRegisteredCallback = handleUnregistered pool
         ,   newIdCallback        = handleNewId pool
         }
+      forkIO $ checker onlineUsers man pool
       writeIORef ref $ Just man
       static@(Static settings) <- static "static"
-      warpEnv $ Messages pool static man pSub $ pack ar
+      warp 3000 $ Messages pool static man pSub onlineUsers $ pack ar
+
+limit :: POSIXTime
+limit = 240
+
+-- 'checker' checks every 30 seconds the webUsers list and removes inactive users.
+checker :: IORef WebUsers -> PushManager -> ConnectionPool -> IO ()
+checker onlineUsers man pool = do
+                        ctime <- liftIO $ getPOSIXTime
+                        (r,c,s) <- atomicModifyIORef onlineUsers (\s ->
+                            let rem = filterClients (\(c,t) -> (ctime - t) > limit) s
+                                names = getClients $ rem
+                                chans = getClientsElems $ rem
+                                s' = filterClients (\(c,t) -> (ctime - t) <= limit) s
+                            in (s', (names,chans,s)) )
+                        liftIO $ putStrLn $ "Remove: " ++ show r
+                        mapM_ (\(us,(ch,_)) -> handleMessage pool s man (Web ch) us Cancel) $ zip r c
+                        mapM_ (\(ch,_) -> sendOffline ch) c
+                        threadDelay 30000000
+                        checker onlineUsers man pool
 

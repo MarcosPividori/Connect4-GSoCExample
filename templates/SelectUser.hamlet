@@ -1,9 +1,0 @@
-<meta http-equiv="refresh" content="5" >
-$maybe _ <- maid
- <div .centre> <b>Your current auth ID:</b> #{show maid} <a href=@{AuthR LogoutR}>Logout</a>
- <div .centre> <b>Select a User to start a new game:</b>
-    $forall usr <- freeList
-      <li>
-        <a href=@{FromWebR (NewGame usr)} >#{usr}
-$nothing
- <div .centre> <a href=@{AuthR LoginR}>Go to the login page

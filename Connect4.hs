@@ -1,4 +1,5 @@
-
+-- GSoC 2013 - Communicating with mobile devices.
+-- This module defines the main functions to save the state of the Connect4 game.
 module Connect4
     ( emptyBoard
     , newMovement
