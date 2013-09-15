@@ -1,4 +1,3 @@
--- GSoC 2013 - Communicating with mobile devices.
 {-# LANGUAGE OverloadedStrings, TypeFamilies, TemplateHaskell, QuasiQuotes, FlexibleContexts, GADTs #-}
              
 -- This module defines the DB structure.
@@ -6,7 +5,7 @@ module DataBase where
 
 import Yesod
 import Data.Text
-import PushNotify.General
+import Network.PushNotify.General
 import Extra
 import Connect4
 

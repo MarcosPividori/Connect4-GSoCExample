@@ -1,4 +1,3 @@
--- GSoC 2013 - Communicating with mobile devices.
 {-# LANGUAGE OverloadedStrings #-}
 
 -- This module defines the main callback functions to communicate with mobile devices using the general library.
@@ -20,8 +19,8 @@ import Control.Applicative
 import Control.Monad                  (mzero)
 import Control.Monad.Logger
 import Control.Monad.Trans.Resource   (runResourceT)
-import PushNotify.Gcm
-import PushNotify.General
+import Network.PushNotify.Gcm
+import Network.PushNotify.General
 import Connect4
 import DataBase
 import Extra

@@ -1,5 +1,4 @@
--- GSoC 2013 - Communicating with mobile devices.
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings , QuasiQuotes #-}
 
 -- This module defines the main function to handle the messages that comes from users (web or device users).
 module Handlers
@@ -18,17 +17,21 @@ import Data.Monoid                    ((<>))
 import Data.Text                      (Text,pack,unpack,empty)
 import Data.Text.Encoding
 import qualified Data.HashMap.Strict  as HM
+import qualified Data.Map             as M
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString      as BS
 import Control.Applicative
 import Control.Monad                  (mzero,when)
 import Control.Monad.Logger
 import Control.Monad.Trans.Resource   (runResourceT)
-import PushNotify.Gcm
-import PushNotify.General
+import Network.PushNotify.Gcm
+import Network.PushNotify.Mpns
+import Network.PushNotify.General
 import Control.Concurrent.Chan (Chan, writeChan)
 import Network.Wai.EventSource (ServerEvent (..))
 import Blaze.ByteString.Builder.Char.Utf8 (fromText)
+import Text.XML
+import Text.Hamlet.XML
 import Connect4
 import DataBase
 import Extra
@@ -46,7 +49,11 @@ setMessage m = let message = case m of
                in (HM.fromList message)
 
 getPushNotif :: Object -> PushNotification
-getPushNotif o = def { gcmNotif  = Just $ def { data_object = Just o } }
+getPushNotif o = def {   gcmNotif  = Just $ def { data_object = Just o }
+                     ,  mpnsNotif  = case HM.lookup "NewGame" o of
+                          Just (String msg) -> Just $ def {target = Toast , restXML = Document (Prologue [] Nothing []) (xmlMessage msg) []}
+                          _        -> Nothing
+                     }
 
 parsMsg :: Value -> Parser MsgFromDevice
 parsMsg (Object v) = setMsg <$>
@@ -166,3 +173,10 @@ handleMessage pool webUsers man id1 user1 msg = do
 sendOffline :: Chan ServerEvent -> IO ()
 sendOffline chan = writeChan chan $ ServerEvent Nothing Nothing $ return $ fromText $
                                     decodeUtf8 $ BS.concat . BL.toChunks $ encode (Object (setMessage Offline))
+
+xmlMessage msg = Element (Name "Notification" (Just "WPNotification") (Just "wp")) (M.singleton "xmlns:wp" "WPNotification") [xml|
+<wp:Toast>
+    <wp:Text1>New message:
+    <wp:Text2>#{msg}
+    <wp:Param>?msg=#{msg}
+|]

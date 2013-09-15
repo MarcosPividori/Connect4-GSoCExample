@@ -1,11 +1,10 @@
--- GSoC 2013 - Communicating with mobile devices.
 {-# LANGUAGE OverloadedStrings, TypeFamilies, TemplateHaskell, TypeSynonymInstances, FlexibleInstances,
                QuasiQuotes, MultiParamTypeClasses, GeneralizedNewtypeDeriving, FlexibleContexts, GADTs #-}
 
 -- This module defines some common datatypes.
 module Extra where
 
-import PushNotify.General
+import Network.PushNotify.General
 import Database.Persist.TH
 import Connect4
 import Data.Text

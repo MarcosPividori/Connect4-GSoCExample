@@ -1,5 +1,3 @@
--- GSoC 2013 - Communicating with mobile devices.
-
 -- Test Example for Push Notifications.
 -- This is a simple example of a Yesod server, where devices can register
 -- and play the multiplayer "Connect 4" game, and send/receive messages.
@@ -24,9 +22,9 @@ import Control.Concurrent
 import Control.Concurrent.Chan          (Chan, newChan)
 import Control.Monad.Logger
 import Control.Monad.Trans.Resource     (runResourceT)
-import PushNotify.Gcm
-import PushNotify.General
-import PushNotify.General.Types 
+import Network.PushNotify.Gcm
+import Network.PushNotify.General
+import Network.HTTP.Conduit
 import Network.Wai.EventSource          (eventSourceAppChan)
 import System.Environment               (getEnv)
 import Connect4
@@ -44,8 +42,8 @@ staticFiles "static"
 data Messages = Messages {
                             connectionPool :: ConnectionPool -- Connection to the Database.
                          ,  getStatic      :: Static         -- Reference point of the static data.
-                         ,  manager        :: PushManager
-                         ,  pushAppSub     :: PushAppSub
+                         ,  pushManager    :: PushManager
+                         ,  httpManager    :: Manager
                          ,  onlineUsers    :: IORef WebUsers
                          ,  theApproot     :: Text
                          }
@@ -59,7 +57,7 @@ mkYesod "Messages" [parseRoutes|
 / RootR GET
 /fromweb FromWebR POST
 /receive ReceiveR GET
-/fromdevices PushAppSubR PushAppSub pushAppSub
+/fromdevices PushManagerR PushManager pushManager
 /getusers GetUsersR GET
 /static StaticR Static getStatic
 /auth AuthR Auth getAuth
@@ -99,7 +97,7 @@ instance YesodAuth Messages where
         [ authBrowserId def
         , authGoogleEmail
         ]
-    authHttpManager = (\(Just m) -> m) . httpManager . manager
+    authHttpManager = httpManager
     maybeAuthId = lookupSession "_ID"
 
 instance YesodPersist Messages where
@@ -136,11 +134,11 @@ postFromWebR = do
             Nothing      -> redirect $ AuthR LoginR
             Just (id1,_) -> do
                 m <- runInputGet $ iopt textField "message"
-                liftIO $ putStrLn $ "New Message : " ++ show m
+                $(logInfo) . pack $ "New Message : " ++ show m
                 case m >>= readMaybe . unpack of
-                  Just msg -> liftIO $ do
-                                         liftIO $ putStrLn $ "New parsed Message : " ++ show msg
-                                         handleMessage pool list man (Web id1) user1 msg
+                  Just msg -> do
+                                $(logInfo) . pack $ "New parsed Message : " ++ show msg
+                                liftIO $ handleMessage pool list man (Web id1) user1 msg
                   _ -> return ()
                 redirect RootR
 
@@ -216,23 +214,21 @@ main = do
      liftIO $ do
       ref <- newIORef Nothing
       onlineUsers <- newIORef newWebUsersState
-      (man,pSub) <- startPushService $ PushServiceConfig{
+      man <- startPushService $ PushServiceConfig{
             pushConfig           = def{
-                                       gcmAppConfig  = Just $ GCMAppConfig 
-                                                              ""
-                                                              ""
-                                                              5 
-                                   ,   mpnsAppConfig = Just def
+                                       gcmConfig  = Just $ Http $ def{ apiKey = "" }
+                                   ,   mpnsConfig = Just def
                                    }
         ,   newMessageCallback   = handleNewMessage pool onlineUsers ref
         ,   newDeviceCallback    = handleNewDevice pool
         ,   unRegisteredCallback = handleUnregistered pool
         ,   newIdCallback        = handleNewId pool
         }
+      m <- newManager def
       forkIO $ checker onlineUsers man pool
       writeIORef ref $ Just man
       static@(Static settings) <- static "static"
-      warp 3000 $ Messages pool static man pSub onlineUsers $ pack ar
+      warpEnv $ Messages pool static man m onlineUsers $ pack ar
 
 limit :: POSIXTime
 limit = 240
@@ -240,14 +236,14 @@ limit = 240
 -- 'checker' checks every 30 seconds the webUsers list and removes inactive users.
 checker :: IORef WebUsers -> PushManager -> ConnectionPool -> IO ()
 checker onlineUsers man pool = do
-                        ctime <- liftIO $ getPOSIXTime
+                        ctime <- getPOSIXTime
                         (r,c,s) <- atomicModifyIORef onlineUsers (\s ->
                             let rem = filterClients (\(c,t) -> (ctime - t) > limit) s
                                 names = getClients $ rem
                                 chans = getClientsElems $ rem
                                 s' = filterClients (\(c,t) -> (ctime - t) <= limit) s
                             in (s', (names,chans,s)) )
-                        liftIO $ putStrLn $ "Remove: " ++ show r
+                        putStrLn $ "Remove: " ++ show r
                         mapM_ (\(us,(ch,_)) -> handleMessage pool s man (Web ch) us Cancel) $ zip r c
                         mapM_ (\(ch,_) -> sendOffline ch) c
                         threadDelay 30000000

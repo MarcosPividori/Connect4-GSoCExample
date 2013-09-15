@@ -1,4 +1,3 @@
--- GSoC 2013 - Communicating with mobile devices.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 

@@ -1,4 +1,3 @@
--- GSoC 2013 - Communicating with mobile devices.
 {-# LANGUAGE OverloadedStrings #-}
 
 -- This module defines the main functions to handle the list of Web users.
@@ -23,7 +22,7 @@ import qualified Data.Text.IO               as T
 import Control.Concurrent.Chan              (Chan)
 import qualified Data.HashMap.Strict        as HM
 import qualified Data.Attoparsec.ByteString as AB
-import PushNotify.General.Types
+import Network.PushNotify.General
 import Data.Time.Clock.POSIX
 import Handlers
 import Extra
