@@ -22,11 +22,11 @@ import Control.Concurrent
 import Control.Concurrent.Chan          (Chan, newChan)
 import Control.Monad.Logger
 import Control.Monad.Trans.Resource     (runResourceT)
+import System.Environment               (getEnv)
+import System.Timeout
 import Network.PushNotify.Gcm
 import Network.PushNotify.General
 import Network.HTTP.Conduit
-import Network.Wai.EventSource          (eventSourceAppChan)
-import System.Environment               (getEnv)
 import Connect4
 import CommWebUsers
 import CommDevices
@@ -142,22 +142,30 @@ postFromWebR = do
                   _ -> return ()
                 redirect RootR
 
--- 'getReceiveR' establishes configurations to enable Server-sent events to the website user. (GET messages to '/receive')
+-- 'getReceiveR' wait for an event. (GET messages to '/receive')
 getReceiveR :: Handler ()
 getReceiveR = do
     maid <- maybeAuthId
     case maid of
       Nothing    -> return ()
       Just user1 -> do
-          Messages _ _ _ _ webUsers _ <- getYesod
-          chan <- liftIO $ newChan
-          ctime <- liftIO $ getPOSIXTime
-          liftIO $ atomicModifyIORef webUsers (\s ->
-               let s' = addClient user1 chan ctime s
-               in (s', s') )
-          req <- waiRequest
-          res <- liftResourceT $ eventSourceAppChan chan req
-          sendWaiResponse res
+          Messages _ _ _ _ webRef _ <- getYesod
+          webUsers <- liftIO $ readIORef webRef
+          case getClient user1 webUsers of
+            Nothing -> do
+              chan <- liftIO $ newChan
+              ctime <- liftIO $ getPOSIXTime
+              liftIO $ atomicModifyIORef webRef (\s ->
+                   let s' = addClient user1 chan ctime s
+                   in (s', ()) )
+              sendResponse $ RepJson emptyContent
+            Just (ch,_) -> do
+              actualize user1
+              res <- liftIO $ timeout 10000000 $ readChan ch
+              $(logInfo) $ pack $ "Sending MESSAGE TO WEBUSER" ++ show res
+              case res of
+                Nothing -> sendResponse $ RepJson emptyContent
+                Just r  -> sendResponse $ RepJson $ toContent $ setMessageValue r
 
 -- 'getRootR' provides the main page.
 getRootR :: Handler Html
@@ -215,9 +223,8 @@ main = do
       ref <- newIORef Nothing
       onlineUsers <- newIORef newWebUsersState
       man <- startPushService $ PushServiceConfig{
-            pushConfig           = def{
-                                       gcmConfig  = Just $ Http $ def{ apiKey = "" }
-                                   ,   mpnsConfig = Just def
+            pushConfig           = def{ gcmConfig  = Just $ Http $ def{apiKey = ""}
+                                   ,    mpnsConfig = Just def
                                    }
         ,   newMessageCallback   = handleNewMessage pool onlineUsers ref
         ,   newDeviceCallback    = handleNewDevice pool
@@ -245,7 +252,5 @@ checker onlineUsers man pool = do
                             in (s', (names,chans,s)) )
                         putStrLn $ "Remove: " ++ show r
                         mapM_ (\(us,(ch,_)) -> handleMessage pool s man (Web ch) us Cancel) $ zip r c
-                        mapM_ (\(ch,_) -> sendOffline ch) c
                         threadDelay 30000000
                         checker onlineUsers man pool
-

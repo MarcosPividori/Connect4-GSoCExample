@@ -37,7 +37,6 @@ lookForIdentifier v = do
                     case (HM.lookup "system" v) of
                       Just (String "ANDROID") -> return $ GCM  regId -- A Android device.
                       Just (String "WPHONE")  -> return $ MPNS regId -- A WPhone device.
-                      Just (String "IOS")     -> return $ APNS regId -- A iOS device.
                       _                       -> invalidArgs []
 
 -- 'postMessages' allows a mobile device to send a message. (JSON POST messages to '/messages')

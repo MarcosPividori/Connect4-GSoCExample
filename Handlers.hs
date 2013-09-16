@@ -4,7 +4,7 @@
 module Handlers
     ( handleMessage
     , parsMessage
-    , sendOffline
+    , setMessageValue
     ) where
 
 import Database.Persist.Sqlite
@@ -17,6 +17,7 @@ import Data.Monoid                    ((<>))
 import Data.Text                      (Text,pack,unpack,empty)
 import Data.Text.Encoding
 import qualified Data.HashMap.Strict  as HM
+import qualified Data.HashSet         as HS
 import qualified Data.Map             as M
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString      as BS
@@ -27,8 +28,7 @@ import Control.Monad.Trans.Resource   (runResourceT)
 import Network.PushNotify.Gcm
 import Network.PushNotify.Mpns
 import Network.PushNotify.General
-import Control.Concurrent.Chan (Chan, writeChan)
-import Network.Wai.EventSource (ServerEvent (..))
+import Control.Concurrent.Chan        (Chan, writeChan)
 import Blaze.ByteString.Builder.Char.Utf8 (fromText)
 import Text.XML
 import Text.Hamlet.XML
@@ -38,22 +38,23 @@ import Extra
 
 runDBAct p a = runResourceT . runNoLoggingT $ runSqlPool a p
 
-setMessage :: MsgFromDevice -> Object
-setMessage m = let message = case m of
+setMessageValue :: MsgFromDevice -> Value
+setMessageValue m = let message = case m of
                                Cancel         -> [(pack "Cancel" .= pack "")]
                                Movement mov   -> [(pack "Movement" .= (pack $ show mov) )]
                                NewGame usr    -> [(pack "NewGame" .= usr)]
                                Winner  usr    -> [(pack "Winner" .= usr)]
                                NewMessage _ m -> [(pack "NewMessage" .= m)]
                                Offline        -> [(pack "Offline" .= pack "")]
-               in (HM.fromList message)
+               in (Object $ HM.fromList message)
 
-getPushNotif :: Object -> PushNotification
-getPushNotif o = def {   gcmNotif  = Just $ def { data_object = Just o }
+getPushNotif :: Value -> PushNotification
+getPushNotif (Object o) = def {   gcmNotif  = Just $ def { data_object = Just o }
                      ,  mpnsNotif  = case HM.lookup "NewGame" o of
                           Just (String msg) -> Just $ def {target = Toast , restXML = Document (Prologue [] Nothing []) (xmlMessage msg) []}
                           _        -> Nothing
                      }
+getPushNotif _          = def
 
 parsMsg :: Value -> Parser MsgFromDevice
 parsMsg (Object v) = setMsg <$>
@@ -78,7 +79,7 @@ handleMessage pool webUsers man id1 user1 msg = do
       Cancel       -> do--Cancel
           mId2 <- getOpponentId user1
           case mId2 of
-            Just (id2,_) -> sendMessage (setMessage Cancel) id2
+            Just (id2,_) -> sendMessage Cancel id2
             _            -> return ()
           deleteGame user1
 
@@ -86,13 +87,13 @@ handleMessage pool webUsers man id1 user1 msg = do
           mId2 <- getOpponentId user1
           game <- getGame user1
           case (mId2,game) of
-            (Nothing,_)       -> sendMessage (setMessage Cancel) id1
-            (_,Nothing)       -> sendMessage (setMessage Cancel) id1
+            (Nothing,_)       -> sendMessage Cancel id1
+            (_,Nothing)       -> sendMessage Cancel id1
             (Just (id2,user2),Just g) -> do
                 if gamesTurn (entityVal g) /= user1
                   then return ()
                   else do
-                         sendMessage (setMessage $ Movement mov) id2
+                         sendMessage (Movement mov) id2
                          let newBoard = if gamesUser1 (entityVal g) == user1
                                           then newMovement mov 1 (gamesMatrix(entityVal g))
                                           else newMovement mov (-1) (gamesMatrix(entityVal g))
@@ -102,8 +103,8 @@ handleMessage pool webUsers man id1 user1 msg = do
                                let msg = if x == 1 
                                            then Winner $ gamesUser1 (entityVal g)
                                            else Winner $ gamesUser2 (entityVal g)
-                               sendMessage (setMessage $ msg) id1
-                               sendMessage (setMessage $ msg) id2
+                               sendMessage msg id1
+                               sendMessage msg id2
                                deleteGame user1
                                return ()
 
@@ -112,28 +113,27 @@ handleMessage pool webUsers man id1 user1 msg = do
           res2 <- isPlaying user2
           case (res1,res2) of
             (Just id2,False) -> do
-                 sendMessage (setMessage $ NewGame user1) id2
+                 sendMessage (NewGame user1) id2
                  runDBAct pool $ insert $ Games user1 user2 user2 emptyBoard
                  return ()
-            (_,_) -> sendMessage (setMessage Cancel) id1
+            (_,_) -> sendMessage Cancel id1
 
       NewMessage dest us -> if dest == ""
                               then mapM_ (\s -> when (Web s /= id1) $ sendMessage 
-                                                     (setMessage $ NewMessage "" (user1<>": "<>us)) (Web s))
+                                                     (NewMessage "" (user1<>": "<>us)) (Web s))
                                          (map fst $ HM.elems webUsers)
                               else do
                                      res <- getIdentifier dest
                                      case res of
-                                       Just s -> sendMessage (setMessage $ NewMessage "" (user1<>": "<>us)) s
+                                       Just s -> sendMessage (NewMessage "" (user1<>": "<>us)) s
                                        _      -> return ()
       _ -> return ()
     where
         sendMessage msg id = case id of
                                Web chan -> do
                                              putStrLn $ "Envio en channel: " ++ show msg
-                                             writeChan chan $ ServerEvent Nothing Nothing $ return $ fromText $
-                                                       decodeUtf8 $ BS.concat . BL.toChunks $ encode (Object msg)
-                               Dev d    -> sendPush man (getPushNotif msg) [d] >> return ()
+                                             writeChan chan msg
+                               Dev d    -> sendPush man (getPushNotif $ setMessageValue msg) (HS.singleton d) >> return ()
         
         deleteGame usr     = do
                                runDBAct pool $ deleteBy $ UniqueUser1 usr
@@ -169,10 +169,6 @@ handleMessage pool webUsers man id1 user1 msg = do
                                case (game1,game2) of
                                  (Nothing,Nothing) -> return False
                                  _                 -> return True
-
-sendOffline :: Chan ServerEvent -> IO ()
-sendOffline chan = writeChan chan $ ServerEvent Nothing Nothing $ return $ fromText $
-                                    decodeUtf8 $ BS.concat . BL.toChunks $ encode (Object (setMessage Offline))
 
 xmlMessage msg = Element (Name "Notification" (Just "WPNotification") (Just "wp")) (M.singleton "xmlns:wp" "WPNotification") [xml|
 <wp:Toast>
