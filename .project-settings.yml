@@ -1,7 +1,10 @@
 extensions: {}
 cabal-file: project.cabal
+extra-packages: ! 'retry-0.3.0.0
+
+  xml-hamlet-0.4.0.5'
 version: 1
-environment: null
+environment: ghc-7.4.2-stable-13.09
 module-template: ! 'module MODULE_NAME where
 
 '
