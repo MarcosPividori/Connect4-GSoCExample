@@ -1,6 +1,6 @@
 -- GSoC 2013 - Communicating with mobile devices.
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings , PackageImports, PackageImports #-}
 
 -- | This Module define the main data types for sending Push Notifications through Microsoft Push Notification Service.
 module Network.PushNotify.Mpns.Types
@@ -28,7 +28,7 @@ import Text.XML
 import Control.Monad.Writer
 import qualified Control.Exception      as CE
 import qualified Data.HashMap.Strict    as HM
-import qualified Data.HashSet           as HS
+import qualified "unordered-containers" Data.HashSet           as HS
 
 -- | 'MPNSConfig' represents the main necessary information for sending notifications through MPNS.
 -- If it is not necessary a secure connection, the default value can be used.
@@ -102,3 +102,4 @@ data MPNSinfo = MPNSinfo {
     ,   subscriptionStatus :: Maybe MPNSsubStatus
     ,   connectionStatus   :: Maybe MPNSconStatus
     } deriving Show
+

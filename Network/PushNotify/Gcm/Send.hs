@@ -1,6 +1,6 @@
 -- GSoC 2013 - Communicating with mobile devices.
 
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, PackageImports #-}
 
 -- | This Module define the main function to send Push Notifications through Google Cloud Messaging (HTTP connection).
 module Network.PushNotify.Gcm.Send (sendGCM) where
@@ -17,13 +17,13 @@ import Data.Map                         (Map,lookup)
 import Data.String
 import Data.Text                        (Text, pack, unpack, empty)
 import qualified Data.ByteString.Char8  as B
-import qualified Data.HashMap.Strict    as HM
-import qualified Data.HashSet           as HS
+import qualified "unordered-containers" Data.HashMap.Strict    as HM
+import qualified "unordered-containers" Data.HashSet           as HS
 import Control.Concurrent
 import Control.Monad.IO.Class           (liftIO)
 import Control.Monad.Trans.Control      (MonadBaseControl)
 import Control.Monad.Trans.Resource     (MonadResource,runResourceT)
-import Contrl.Retry
+import Control.Retry
 import Network.HTTP.Types
 import Network.HTTP.Conduit
 

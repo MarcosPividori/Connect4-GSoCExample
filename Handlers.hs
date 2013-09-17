@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings , QuasiQuotes #-}
+{-# LANGUAGE OverloadedStrings , QuasiQuotes , PackageImports #-}
 
 -- This module defines the main function to handle the messages that comes from users (web or device users).
 module Handlers
@@ -17,7 +17,7 @@ import Data.Monoid                    ((<>))
 import Data.Text                      (Text,pack,unpack,empty)
 import Data.Text.Encoding
 import qualified Data.HashMap.Strict  as HM
-import qualified Data.HashSet         as HS
+import qualified "unordered-containers" Data.HashSet         as HS
 import qualified Data.Map             as M
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString      as BS
@@ -50,9 +50,10 @@ setMessageValue m = let message = case m of
 
 getPushNotif :: Value -> PushNotification
 getPushNotif (Object o) = def {   gcmNotif  = Just $ def { data_object = Just o }
-                     ,  mpnsNotif  = case HM.lookup "NewGame" o of
-                          Just (String msg) -> Just $ def {target = Toast , restXML = Document (Prologue [] Nothing []) (xmlMessage msg) []}
-                          _        -> Nothing
+                              ,  mpnsNotif  = case HM.lookup "NewMessage" o of
+                                  Just (String msg) -> Just $ def { target = Toast
+                                                                  , restXML = Document (Prologue [] Nothing []) (xmlMessage msg) []}
+                                  _                 -> Nothing
                      }
 getPushNotif _          = def
 
@@ -131,10 +132,12 @@ handleMessage pool webUsers man id1 user1 msg = do
     where
         sendMessage msg id = case id of
                                Web chan -> do
-                                             putStrLn $ "Envio en channel: " ++ show msg
+                                             putStrLn $ "Sending on channel: " ++ show msg
                                              writeChan chan msg
-                               Dev d    -> sendPush man (getPushNotif $ setMessageValue msg) (HS.singleton d) >> return ()
-        
+                               Dev d    -> do
+                                             putStrLn $ "Sending on PushServer: " ++ show msg
+                                             res <- sendPush man (getPushNotif $ setMessageValue msg) (HS.singleton d) >> return ()
+                                             putStrLn $ "PushResult: " ++ show res
         deleteGame usr     = do
                                runDBAct pool $ deleteBy $ UniqueUser1 usr
                                runDBAct pool $ deleteBy $ UniqueUser2 usr
@@ -176,3 +179,4 @@ xmlMessage msg = Element (Name "Notification" (Just "WPNotification") (Just "wp"
     <wp:Text2>#{msg}
     <wp:Param>?msg=#{msg}
 |]
+

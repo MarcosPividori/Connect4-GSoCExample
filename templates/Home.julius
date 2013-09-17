@@ -48,11 +48,6 @@ function newMessage(obj) {
             selectUser();
             sendNewMessage();
         }
-        if(obj["Offline"] != null){
-            $('#offline').show();
-            $('#grid').hide();
-            $('#users').hide();
-        }
 }
 
 function movement(pos,player){
@@ -289,7 +284,6 @@ window.alert = function(msg){
 })();
 
 $(document).ready(function () {
-    $('#offline').hide();
     obj = #{jsonData};    
     playing = obj["playing"];
     user1 = obj["user1"];

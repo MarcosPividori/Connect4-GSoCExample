@@ -17,3 +17,4 @@
             <p><input type="submit" value="Send" style="font-weight:bold;" onclick="sendM();">
         <div id="offline">
             You are offline. <a href=@{RootR}><b>Restart</b></a>
+

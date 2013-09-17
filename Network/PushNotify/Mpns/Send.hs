@@ -1,6 +1,6 @@
 -- GSoC 2013 - Communicating with mobile devices.
 
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, PackageImports #-}
 
 -- | This Module define the main function to send Push Notifications through Microsoft Push Notification Service.
 module Network.PushNotify.Mpns.Send (sendMPNS) where
@@ -16,13 +16,13 @@ import Data.Text                        (Text, pack, unpack, empty)
 import Data.Text.Encoding               (decodeUtf8)
 import Text.XML
 import qualified Control.Exception      as CE
-import qualified Data.HashMap.Strict    as HM
-import qualified Data.HashSet           as HS
+import qualified "unordered-containers" Data.HashMap.Strict    as HM
+import qualified "unordered-containers" Data.HashSet           as HS
 import Control.Concurrent.Async
 import Control.Monad.IO.Class           (liftIO)
 import Control.Monad.Trans.Control      (MonadBaseControl)
 import Control.Monad.Trans.Resource     (MonadResource,runResourceT)
-import Contrl.Retry
+import Control.Retry
 import Network.HTTP.Types
 import Network.HTTP.Conduit
 

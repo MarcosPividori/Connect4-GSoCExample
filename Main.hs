@@ -161,7 +161,7 @@ getReceiveR = do
               sendResponse $ RepJson emptyContent
             Just (ch,_) -> do
               actualize user1
-              res <- liftIO $ timeout 10000000 $ readChan ch
+              res <- liftIO $ timeout 20000000 $ readChan ch
               $(logInfo) $ pack $ "Sending MESSAGE TO WEBUSER" ++ show res
               case res of
                 Nothing -> sendResponse $ RepJson emptyContent
@@ -254,3 +254,4 @@ checker onlineUsers man pool = do
                         mapM_ (\(us,(ch,_)) -> handleMessage pool s man (Web ch) us Cancel) $ zip r c
                         threadDelay 30000000
                         checker onlineUsers man pool
+

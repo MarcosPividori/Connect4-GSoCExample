@@ -1,5 +1,5 @@
 -- | This Module define the main functions to send Push Notifications.
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables , PackageImports #-}
 module Network.PushNotify.General.Send(
     startPushService
   , closePushService
@@ -19,7 +19,7 @@ import Control.Concurrent
 import Control.Monad
 import Control.Exception                as CE
 import qualified Data.HashMap.Strict    as HM
-import qualified Data.HashSet           as HS
+import qualified "unordered-containers" Data.HashSet           as HS
 import Network.HTTP.Conduit
 import Network.PushNotify.Gcm
 import Network.PushNotify.Mpns
@@ -66,12 +66,9 @@ sendPush man notif devices = do
         mpnsDevices = HS.map forgetConst $ HS.filter isMPNS devices
         pConfig     = serviceConfig man
         config      = pushConfig pConfig
-
-    r1 <- case (HS.null gcmDevices , gcmConfig config , gcmNotif  notif , httpManager man) of
-              (False,Just (Http cnf),Just msg,Just m) -> sendGCM' m cnf msg{registration_ids = gcmDevices}
-
-              _                                          -> return def
-
+    r1 <- case (gcmConfig config , gcmNotif  notif , httpManager man) of
+              (Just (Http cnf),Just msg,Just m) -> sendGCM' m cnf msg{registration_ids = gcmDevices}
+              _                                 -> return def
     r3 <- case (HS.null mpnsDevices , mpnsConfig config , mpnsNotif notif , httpManager man) of
               (False,Just cnf,Just msg,Just m) -> sendMPNS' m cnf msg{deviceURIs = mpnsDevices}
               _                                -> return def
@@ -90,3 +87,4 @@ sendPush man notif devices = do
                         (\(e :: CE.SomeException) -> return $ exceptionResult ( HM.fromList $ map (\d -> (GCM d,Right e)) $ 
                                                                                 HS.toList $ registration_ids c))
       exceptionResult l = PushResult HS.empty l HS.empty HS.empty HM.empty
+

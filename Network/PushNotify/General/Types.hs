@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings , DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings , DeriveGeneric, PackageImports #-}
 -- | This Module defines the main data types for the Push Service.
 module Network.PushNotify.General.Types
     ( -- * Push Settings     
@@ -27,8 +27,8 @@ import qualified Data.Map               as M
 import qualified Data.ByteString.Lazy   as BL
 import qualified Data.ByteString        as BS
 import qualified Data.Text.Encoding     as E
-import qualified Data.HashMap.Strict    as HM
-import qualified Data.HashSet           as HS
+import qualified "unordered-containers" Data.HashMap.Strict    as HM
+import qualified "unordered-containers" Data.HashSet           as HS
 import GHC.Generics  (Generic)
 import Data.Aeson
 import Data.Default
@@ -41,9 +41,13 @@ import Text.XML
 -- | Unique identifier of an app/device.
 data Device = GCM  RegId        -- ^ An Android app.
             | MPNS DeviceURI    -- ^ A WPhone app.
-            deriving (Show, Read, Eq, Generic)
+            deriving (Show, Read, Eq)
 
-instance Hashable Device
+instance Hashable Device where
+     hashWithSalt s (GCM n)   = s `hashWithSalt`
+                                 (0::Int) `hashWithSalt` n
+     hashWithSalt s (MPNS n)  = s `hashWithSalt`
+                                 (1::Int) `hashWithSalt` n
 
 -- | General notification to be sent.
 data PushNotification = PushNotification {
@@ -167,3 +171,4 @@ instance IsPushResult MPNSresult where
         error500 e = case (fromException e) :: Maybe HttpException of
                          Just (StatusCodeException status _ _) -> (statusCode status) >= 500
                          _                                     -> False
+

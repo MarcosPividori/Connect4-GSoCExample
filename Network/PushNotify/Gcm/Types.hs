@@ -1,6 +1,6 @@
 -- GSoC 2013 - Communicating with mobile devices.
 
-{-# LANGUAGE FlexibleContexts , OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts , OverloadedStrings, PackageImports #-}
 
 -- | This Module define the main data types for sending Push Notifications through Google Cloud Messaging.
 module Network.PushNotify.Gcm.Types
@@ -17,7 +17,7 @@ module Network.PushNotify.Gcm.Types
 import Network.PushNotify.Gcm.Constants
 import Control.Monad.Writer
 import qualified Data.HashMap.Strict    as HM
-import qualified Data.HashSet           as HS
+import qualified "unordered-containers" Data.HashSet as HS
 import Data.Aeson.Types
 import Data.Default
 import Data.Monoid
@@ -110,10 +110,11 @@ ifNotDef label f msg = if f def /= f msg
 
 instance ToJSON GCMmessage where
     toJSON msg = object $ execWriter $ do
-                                         ifNotDef cREGISTRATION_IDS (HS.toList . registration_ids) msg
+                                         tell [cREGISTRATION_IDS .= HS.toList (registration_ids msg)]
                                          ifNotDef cTIME_TO_LIVE time_to_live msg
                                          ifNotDef cDATA data_object msg
                                          ifNotDef cCOLLAPSE_KEY collapse_key msg
                                          ifNotDef cRESTRICTED_PACKAGE_NAME restricted_package_name msg
                                          ifNotDef cDELAY_WHILE_IDLE delay_while_idle msg
                                          ifNotDef cDRY_RUN dry_run msg
+
