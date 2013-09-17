@@ -13,22 +13,22 @@ import Data.Aeson
 import Data.Conduit.Pool
 import Data.Default
 import Data.IORef
-import Data.Monoid                    ((<>))
-import Data.Text                      (Text,pack,unpack,empty)
+import Data.Monoid                        ((<>))
+import Data.Text                          (Text,pack,unpack,empty)
 import Data.Text.Encoding
-import qualified Data.HashMap.Strict  as HM
-import qualified "unordered-containers" Data.HashSet         as HS
-import qualified Data.Map             as M
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString      as BS
+import qualified Data.HashMap.Strict      as HM
+import qualified "unordered-containers" Data.HashSet    as HS
+import qualified Data.Map                 as M
+import qualified Data.ByteString.Lazy     as BL
+import qualified Data.ByteString          as BS
 import Control.Applicative
-import Control.Monad                  (mzero,when)
+import Control.Monad                      (mzero,when)
 import Control.Monad.Logger
-import Control.Monad.Trans.Resource   (runResourceT)
+import Control.Monad.Trans.Resource       (runResourceT)
 import Network.PushNotify.Gcm
 import Network.PushNotify.Mpns
 import Network.PushNotify.General
-import Control.Concurrent.Chan        (Chan, writeChan)
+import Control.Concurrent.Chan            (Chan, writeChan)
 import Blaze.ByteString.Builder.Char.Utf8 (fromText)
 import Text.XML
 import Text.Hamlet.XML
@@ -46,7 +46,7 @@ setMessageValue m = let message = case m of
                                Winner  usr    -> [(pack "Winner" .= usr)]
                                NewMessage _ m -> [(pack "NewMessage" .= m)]
                                Offline        -> [(pack "Offline" .= pack "")]
-               in (Object $ HM.fromList message)
+                    in (Object $ HM.fromList message)
 
 getPushNotif :: Value -> PushNotification
 getPushNotif (Object o) = def {   gcmNotif  = Just $ def { data_object = Just o }
@@ -54,7 +54,7 @@ getPushNotif (Object o) = def {   gcmNotif  = Just $ def { data_object = Just o 
                                   Just (String msg) -> Just $ def { target = Toast
                                                                   , restXML = Document (Prologue [] Nothing []) (xmlMessage msg) []}
                                   _                 -> Nothing
-                     }
+                              }
 getPushNotif _          = def
 
 parsMsg :: Value -> Parser MsgFromDevice
@@ -136,7 +136,10 @@ handleMessage pool webUsers man id1 user1 msg = do
                                              writeChan chan msg
                                Dev d    -> do
                                              putStrLn $ "Sending on PushServer: " ++ show msg
-                                             res <- sendPush man (getPushNotif $ setMessageValue msg) (HS.singleton d) >> return ()
+                                             res <- sendPush man (getPushNotif $ setMessageValue msg) (HS.singleton d)
+                                             if HM.null (failed res)
+                                              then return ()
+                                              else fail "Problem Communicating with Push Servers"
                                              putStrLn $ "PushResult: " ++ show res
         deleteGame usr     = do
                                runDBAct pool $ deleteBy $ UniqueUser1 usr
@@ -179,4 +182,3 @@ xmlMessage msg = Element (Name "Notification" (Just "WPNotification") (Just "wp"
     <wp:Text2>#{msg}
     <wp:Param>?msg=#{msg}
 |]
-

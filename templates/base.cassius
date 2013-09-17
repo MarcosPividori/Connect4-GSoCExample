@@ -29,6 +29,13 @@ div#info
     margin-right: auto
     text-align: left
 
+div#turn
+    width: 400px
+    display: block
+    margin-left: auto
+    margin-right: auto
+    text-align: left
+        
 a#cancel
     width: 400px
     display: block

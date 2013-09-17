@@ -59,7 +59,9 @@ function movement(pos,player){
         turn = user1;
         im = "@{StaticR yellow_png}";
     }
-    
+    var sound = new Audio("@{StaticR waterdrop_mp3}");
+    sound.play();
+    $('#turn').html("<p><b>Turn:</b> " + turn + "</p>");
     if(rows[pos].src != "@{StaticR empty_png}")
            return false;
     for (var i=0;i<5;i++)
@@ -88,15 +90,10 @@ function cancel(){
 
 function createGrid(){
     var div = document.createElement("div");
-    var but = document.createElement("input");    
-    var p = document.createElement('p');
-    p.innerHTML = "<b>Playing against:</b> " + user2;
-    div.appendChild(p);
-    p = document.createElement('p');
-    p.innerHTML = "<b>Turn:</b> " + turn;
-    div.appendChild(p);
-    $('#info').append(div);
-        
+    var but = document.createElement("input");
+    $('#info').html("<p><b>Playing against:</b> " + user2 + "</p>");
+    $('#turn').html("<p><b>Turn:</b> " + turn + "</p>");
+
     for(var i=0;i<6;i++)
     {
         for (var j=0;j<7;j++)
@@ -194,7 +191,7 @@ function newGame(startedByMe){
     createGrid();
 }
 
-function clear1(){
+function clearM(){
     $('#history').empty();
 }
 
@@ -303,3 +300,4 @@ $(document).ready(function () {
         sendNewMessage();
     }
 });
+
