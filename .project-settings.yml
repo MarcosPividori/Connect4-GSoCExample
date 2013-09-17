@@ -1,0 +1,53 @@
+extensions: {}
+cabal-file: project.cabal
+version: 1
+environment: null
+module-template: ! 'module MODULE_NAME where
+
+'
+ghc-args: []
+modules:
+  Network.PushNotify.General.Types:
+    filename: Network/PushNotify/General/Types.hs
+  Handlers:
+    filename: Handlers.hs
+  Contrl.Retry:
+    filename: Contrl/Retry.hs
+  Import:
+    filename: Import.hs
+  CommDevices:
+    filename: CommDevices.hs
+  Network.PushNotify.Mpns.Types:
+    filename: Network/PushNotify/Mpns/Types.hs
+  DataBase:
+    filename: DataBase.hs
+  Network.PushNotify.Mpns.Constants:
+    filename: Network/PushNotify/Mpns/Constants.hs
+  Network.PushNotify.General.YesodPushApp:
+    filename: Network/PushNotify/General/YesodPushApp.hs
+  Network.PushNotify.General:
+    filename: Network/PushNotify/General.hs
+  Network.PushNotify.General.Send:
+    filename: Network/PushNotify/General/Send.hs
+  CommWebUsers:
+    filename: CommWebUsers.hs
+  Network.PushNotify.Gcm:
+    filename: Network/PushNotify/Gcm.hs
+  Network.PushNotify.Gcm.Send:
+    filename: Network/PushNotify/Gcm/Send.hs
+  Extra:
+    filename: Extra.hs
+  Network.PushNotify.Mpns.Send:
+    filename: Network/PushNotify/Mpns/Send.hs
+  Network.PushNotify.Gcm.Constants:
+    filename: Network/PushNotify/Gcm/Constants.hs
+  Main(Main.hs):
+    filename: Main.hs
+  Network.PushNotify.General.YesodPushAppRoutes:
+    filename: Network/PushNotify/General/YesodPushAppRoutes.hs
+  Connect4:
+    filename: Connect4.hs
+  Network.PushNotify.Mpns:
+    filename: Network/PushNotify/Mpns.hs
+  Network.PushNotify.Gcm.Types:
+    filename: Network/PushNotify/Gcm/Types.hs
