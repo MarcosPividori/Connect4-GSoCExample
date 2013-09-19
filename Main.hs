@@ -224,7 +224,7 @@ getGetUsersR = do
     (freeList,all) <- getFreelist
     sendResponse $ toTypedContent $ object ["users" .= array freeList , "all" .= array all]
 
-connStr = ""
+connStr = "host=localhost dbname=test user=test password=test port=5432"
 
 main :: IO ()
 main = do
