@@ -21,6 +21,7 @@ var numUser = 0;
 var playing;
 var radios = [];
 var dests = [];
+var sound = new Audio("@{StaticR waterdrop_mp3}");
 
 function newMessage(obj) {
         if(obj["NewMessage"] != null){
@@ -59,7 +60,6 @@ function movement(pos,player){
         turn = user1;
         im = "@{StaticR yellow_png}";
     }
-    var sound = new Audio("@{StaticR waterdrop_mp3}");
     sound.play();
     $('#turn').html("<p><b>Turn:</b> " + turn + "</p>");
     if(rows[pos].src != "@{StaticR empty_png}")

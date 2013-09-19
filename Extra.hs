@@ -14,7 +14,7 @@ import qualified Data.HashMap.Strict as HM
 
 data Identifier = Dev Device | Web (Chan MsgFromDevice) deriving Eq
 type WebUsers   = HM.HashMap Text (Chan MsgFromDevice,POSIXTime)
-data MsgFromDevice = Cancel | Movement Int | NewGame Text | Winner Text | NewMessage Text Text | Offline deriving (Show,Read,Eq)
+data MsgFromDevice = Cancel | Movement Int | NewGame Text | Winner Text | NewMessage Text Text deriving (Show,Read,Eq)
 
 derivePersistField "Device"
 derivePersistField "Board"

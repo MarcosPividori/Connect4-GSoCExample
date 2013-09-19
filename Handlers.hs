@@ -7,7 +7,7 @@ module Handlers
     , setMessageValue
     ) where
 
-import Database.Persist.Sqlite
+import Database.Persist.Postgresql
 import Data.Aeson.Types
 import Data.Aeson
 import Data.Conduit.Pool
@@ -45,7 +45,6 @@ setMessageValue m = let message = case m of
                                NewGame usr    -> [(pack "NewGame" .= usr)]
                                Winner  usr    -> [(pack "Winner" .= usr)]
                                NewMessage _ m -> [(pack "NewMessage" .= m)]
-                               Offline        -> [(pack "Offline" .= pack "")]
                     in (Object $ HM.fromList message)
 
 getPushNotif :: Value -> PushNotification

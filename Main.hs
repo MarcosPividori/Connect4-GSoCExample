@@ -11,7 +11,7 @@ import Yesod.Static
 import Yesod.Auth
 import Yesod.Auth.BrowserId
 import Yesod.Auth.GoogleEmail
-import Database.Persist.Sqlite
+import Database.Persist.Postgresql
 import Data.Default
 import Data.IORef
 import Data.List                        ((\\))
@@ -174,6 +174,12 @@ getRootR = do
     case maid of
       Nothing -> redirect $ AuthR LoginR
       Just user1 -> do
+          Messages _ _ _ _ webRef _ <- getYesod
+          ctime <- liftIO $ getPOSIXTime
+          chan  <- liftIO $ newChan
+          liftIO $ atomicModifyIORef webRef (\s ->
+                   let s' = addClient user1 chan ctime s
+                   in (s', ()) )
           g1 <- runDB $ getBy $ UniqueUser1 user1
           g2 <- runDB $ getBy $ UniqueUser2 user1
           let (game,numUser) = case g1 of
@@ -195,14 +201,18 @@ getRootR = do
 
 getFreelist :: Handler ([Text],[Text])
 getFreelist = do
-    list  <- (runDB $ selectList [] [Desc DevicesUser]) >>= return . map (\a -> devicesUser(entityVal a))
+    list  <- (runDB $ selectList [] [Desc DevicesUser])
     Messages _ _ _ _ refUsers _ <- getYesod
     l <- liftIO $ readIORef refUsers
-    let list1 = getClients l
+    let all1  = map (\a -> devicesUser(entityVal a)) list
+        all2  = getClients l
+        all   = all1 ++ all2
+        list1 = (map (\a -> devicesUser(entityVal a)) . filter (\a -> isMPNS $ devicesIdentifier (entityVal a))) list
     list2 <- (runDB $ selectList [] [Desc GamesUser1]) >>= return . map (\a -> gamesUser1(entityVal a))
     list3 <- (runDB $ selectList [] [Desc GamesUser2]) >>= return . map (\a -> gamesUser2(entityVal a))
-    let all = list ++ list1
-    return $ (((all \\ list2) \\ list3),all)
+    return $ (((all \\ list1) \\ list2) \\ list3,all)
+      where isMPNS (MPNS _) = True
+            isMPNS _        = False
 
 -- 'getGetUsersR' provides the list of users that are available to play ("users"), and the complete list ("all").
 getGetUsersR :: Handler RepJson
@@ -214,10 +224,12 @@ getGetUsersR = do
     (freeList,all) <- getFreelist
     sendResponse $ toTypedContent $ object ["users" .= array freeList , "all" .= array all]
 
+connStr = ""
+
 main :: IO ()
 main = do
     ar <- getEnv "APPROOT"
-    runResourceT . runNoLoggingT $ withSqlitePool "DevicesDateBase.db3" 10 $ \pool -> do
+    runResourceT . runNoLoggingT $ withPostgresqlPool connStr 10 $ \pool -> do
      runSqlPool (runMigration migrateAll) pool
      liftIO $ do
       ref <- newIORef Nothing
