@@ -28,7 +28,8 @@ import Control.Monad.Trans.Resource       (runResourceT)
 import Network.PushNotify.Gcm
 import Network.PushNotify.Mpns
 import Network.PushNotify.General
-import Control.Concurrent.Chan            (Chan, writeChan)
+import Control.Concurrent.STM                  (atomically)
+import Control.Concurrent.STM.TChan            (TChan, writeTChan)
 import Blaze.ByteString.Builder.Char.Utf8 (fromText)
 import Text.XML
 import Text.Hamlet.XML
@@ -38,7 +39,7 @@ import Extra
 
 runDBAct p a = runResourceT . runNoLoggingT $ runSqlPool a p
 
-setMessageValue :: MsgFromDevice -> Value
+setMessageValue :: MsgFromPlayer -> Value
 setMessageValue m = let message = case m of
                                Cancel         -> [(pack "Cancel" .= pack "")]
                                Movement mov   -> [(pack "Movement" .= (pack $ show mov) )]
@@ -56,7 +57,7 @@ getPushNotif (Object o) = def {   gcmNotif  = Just $ def { data_object = Just o 
                               }
 getPushNotif _          = def
 
-parsMsg :: Value -> Parser MsgFromDevice
+parsMsg :: Value -> Parser MsgFromPlayer
 parsMsg (Object v) = setMsg <$>
                        v .:? "Cancel"     <*>
                        v .:? "Movement"   <*>
@@ -64,16 +65,16 @@ parsMsg (Object v) = setMsg <$>
                        v .:? "NewMessage"
 parsMsg _          = mzero
 
-parsMessage :: Value -> Maybe MsgFromDevice
+parsMessage :: Value -> Maybe MsgFromPlayer
 parsMessage = parseMaybe parsMsg
 
-setMsg :: Maybe Text -> Maybe Text -> Maybe Text -> Maybe Text -> MsgFromDevice
+setMsg :: Maybe Text -> Maybe Text -> Maybe Text -> Maybe Text -> MsgFromPlayer
 setMsg (Just _) _ _ _ = Cancel
 setMsg _ (Just a) _ _ = Movement ((read $ unpack a) :: Int)
 setMsg _ _ (Just a) _ = NewGame a
 setMsg _ _ _ (Just a) = NewMessage "" a
 
-handleMessage :: Pool Connection -> WebUsers -> PushManager -> Identifier -> Text -> MsgFromDevice -> IO ()
+handleMessage :: Pool Connection -> WebUsers -> PushManager -> Identifier -> Text -> MsgFromPlayer -> IO ()
 handleMessage pool webUsers man id1 user1 msg = do
     case msg of
       Cancel       -> do--Cancel
@@ -132,7 +133,7 @@ handleMessage pool webUsers man id1 user1 msg = do
         sendMessage msg id = case id of
                                Web chan -> do
                                              putStrLn $ "Sending on channel: " ++ show msg
-                                             writeChan chan msg
+                                             atomically $ writeTChan chan msg
                                Dev d    -> do
                                              putStrLn $ "Sending on PushServer: " ++ show msg
                                              res <- sendPush man (getPushNotif $ setMessageValue msg) (HS.singleton d)

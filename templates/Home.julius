@@ -24,6 +24,7 @@ var dests = [];
 var sound = new Audio("@{StaticR waterdrop_mp3}");
 
 function newMessage(obj) {
+    console.log("NEW MESSAGE : %s", obj);
         if(obj["NewMessage"] != null){
             var p = document.createElement('p');
             p.appendChild(document.createTextNode(obj["NewMessage"]));
@@ -275,9 +276,18 @@ window.alert = function(msg){
 };
 
 (function poll(){
-    $.ajax({ url: "@{ReceiveR}", success: function(data){
+    $.ajax({ url: "@{ReceiveR}"
+     , success: function(data){
         newMessage(data);
-    }, dataType: "json", complete: poll, timeout: 0 });
+     }
+     ,dataType: "json"
+     ,complete: poll
+     ,timeout: 15000
+     ,cache: false
+     ,error: function(a , e){
+        console.log("ERROR %s",e);
+     } 
+     });
 })();
 
 $(document).ready(function () {

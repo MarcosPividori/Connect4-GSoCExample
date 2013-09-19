@@ -12,6 +12,7 @@ import Yesod.Auth
 import Yesod.Auth.BrowserId
 import Yesod.Auth.GoogleEmail
 import Database.Persist.Postgresql
+import Data.Aeson
 import Data.Default
 import Data.IORef
 import Data.List                        ((\\))
@@ -19,7 +20,8 @@ import Data.Text                        (Text,pack,unpack,empty)
 import Data.Time.Clock.POSIX
 import qualified Data.Array             as DA
 import Control.Concurrent
-import Control.Concurrent.Chan          (Chan, newChan)
+import Control.Concurrent.STM           (atomically)
+import Control.Concurrent.STM.TChan     (TChan, newTChan, tryReadTChan, readTChan)
 import Control.Monad.Logger
 import Control.Monad.Trans.Resource     (runResourceT)
 import System.Environment               (getEnv)
@@ -55,6 +57,7 @@ readMaybe s = case reads s of
 
 mkYesod "Messages" [parseRoutes|
 / RootR GET
+/apps AppsR GET
 /fromweb FromWebR POST
 /receive ReceiveR GET
 /fromdevices PushManagerR PushManager pushManager
@@ -152,19 +155,13 @@ getReceiveR = do
           Messages _ _ _ _ webRef _ <- getYesod
           webUsers <- liftIO $ readIORef webRef
           case getClient user1 webUsers of
-            Nothing -> do
-              chan <- liftIO $ newChan
-              ctime <- liftIO $ getPOSIXTime
-              liftIO $ atomicModifyIORef webRef (\s ->
-                   let s' = addClient user1 chan ctime s
-                   in (s', ()) )
-              sendResponse $ RepJson emptyContent
+            Nothing -> sendResponse $ RepJson $ toContent $ object [] 
             Just (ch,_) -> do
               actualize user1
-              res <- liftIO $ timeout 20000000 $ readChan ch
+              res <- liftIO $ timeout 10000000 $ (atomically $ readTChan ch)
               $(logInfo) $ pack $ "Sending MESSAGE TO WEBUSER" ++ show res
               case res of
-                Nothing -> sendResponse $ RepJson emptyContent
+                Nothing -> sendResponse $ RepJson $ toContent $ object []
                 Just r  -> sendResponse $ RepJson $ toContent $ setMessageValue r
 
 -- 'getRootR' provides the main page.
@@ -175,11 +172,15 @@ getRootR = do
       Nothing -> redirect $ AuthR LoginR
       Just user1 -> do
           Messages _ _ _ _ webRef _ <- getYesod
-          ctime <- liftIO $ getPOSIXTime
-          chan  <- liftIO $ newChan
-          liftIO $ atomicModifyIORef webRef (\s ->
-                   let s' = addClient user1 chan ctime s
-                   in (s', ()) )
+          webUsers <- liftIO $ readIORef webRef
+          case getClient user1 webUsers of
+            Nothing     -> do
+              ctime <- liftIO $ getPOSIXTime
+              chan <- liftIO $ atomically $ newTChan
+              liftIO $ atomicModifyIORef webRef (\s ->
+                let s' = addClient user1 chan ctime s
+                in (s', ()) )
+            Just (ch,_) -> liftIO $ cleanTChan ch
           g1 <- runDB $ getBy $ UniqueUser1 user1
           g2 <- runDB $ getBy $ UniqueUser2 user1
           let (game,numUser) = case g1 of
@@ -198,6 +199,15 @@ getRootR = do
             Nothing -> do
                 let jsonData = object ["playing" .= False , "user1" .= user1 ]
                 defaultLayout $(widgetFile "Home")
+     where
+         cleanTChan ch = do
+                           r <- atomically $ tryReadTChan ch
+                           case r of
+                             Just _  -> cleanTChan ch
+                             Nothing -> return ()
+
+getAppsR :: Handler Html
+getAppsR = defaultLayout $(widgetFile "Apps")
 
 getFreelist :: Handler ([Text],[Text])
 getFreelist = do
@@ -224,7 +234,7 @@ getGetUsersR = do
     (freeList,all) <- getFreelist
     sendResponse $ toTypedContent $ object ["users" .= array freeList , "all" .= array all]
 
-connStr = "host=localhost dbname=test user=test password=test port=5432"
+connStr = "host=url dbname=dbname user=usr password=pass port=5432"
 
 main :: IO ()
 main = do

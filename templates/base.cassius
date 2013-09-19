@@ -105,6 +105,12 @@ div#deployment
 div#deployment a
     color:#0174DF
 
+div#appsLink
+    width: 70%
+    display: block
+    margin-left: auto
+    margin-right: auto
+
 #alertBox
     position:absolute
     top:40%

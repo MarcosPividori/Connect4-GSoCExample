@@ -16,3 +16,4 @@
             <div id="destin">
             <input type="text" id="msg">
             <p><input type="submit" value="Send" style="font-weight:bold;" onclick="sendM();">
+        <div id="appsLink"> <b> <a href=@{AppsR}> Get Android/WPhone app! </a> </b>

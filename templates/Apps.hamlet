@@ -1,0 +1,15 @@
+<div id="users">
+    <p><b>Android Apps:</b>
+       There are 2 test examples, but you shouldn't install both at the same time, because they share the Project ID.
+       So, before installing it, be sure you have unistalled any previously installed app.
+       <ul>
+            <li> Connect 4: <a href=@{StaticR empty_png}> link
+            <li> BackAndForth Messaging: <a href=@{StaticR empty_png}> link
+
+    <p><b>WPhone Apps:</b>
+       <ul>
+            <li> BackAndForth Messaging: <a href=@{StaticR empty_png}> link
+
+    <p> Source code available on GitHub: <a href="http://github.com/MarcosPividori/GSoC-Communicating-with-mobile-devices/tree/master/test"> link
+    <p> For more information: <a href="http://gsoc2013cwithmobiledevices.blogspot.com.ar"> blog
+    <p> <a href=@{RootR}> Go home site!
