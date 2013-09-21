@@ -142,24 +142,24 @@ function get_dests_value(){
 
 function selectUser(){
     var usrs = JSON.parse(getUsers());
-    if(usrs["users"] != null){
-    radios = new Array((usrs["users"]).length);
+    if(usrs["con4"] != null){
+    radios = new Array((usrs["con4"]).length);
     var div = document.createElement("div");
-    if((usrs["users"]).length <= 1){
+    if((usrs["con4"]).length <= 1){
         var p = document.createElement('p');
         p.appendChild(document.createTextNode("No user available."));
         div.appendChild(p);
     }else{
-        for (var i=0;i<(usrs["users"]).length;i++)
+        for (var i=0;i<(usrs["con4"]).length;i++)
         {
             var p = document.createElement('p');
             radios[i] = document.createElement("input");
             radios[i].setAttribute("type", "radio");
             radios[i].setAttribute("name", "value");
-            radios[i].setAttribute("value", usrs["users"][i]);
-            if(usrs["users"][i] != user1){
+            radios[i].setAttribute("value", usrs["con4"][i]);
+            if(usrs["con4"][i] != user1){
                 p.appendChild(radios[i]);
-                p.appendChild(document.createTextNode(" "+usrs["users"][i]));
+                p.appendChild(document.createTextNode(" "+usrs["con4"][i]));
                 div.appendChild(p);
             }
         }
@@ -221,20 +221,20 @@ function startM(){
 
 function sendNewMessage(){
     var usrs = JSON.parse(getUsers());
-    if(usrs["all"] != null){
-    dests = new Array((usrs["all"]).length+1);
+    if(usrs["mess"] != null){
+    dests = new Array((usrs["mess"]).length+1);
     var div = document.createElement("div");
     var p;
-    for (var i=0;i<(usrs["users"]).length;i++)
+    for (var i=0;i<(usrs["mess"]).length;i++)
     {
         p = document.createElement('p');
         dests[i] = document.createElement("input");
         dests[i].setAttribute("type", "radio");
         dests[i].setAttribute("name", "value");
-        dests[i].setAttribute("value", usrs["all"][i]);
-        if(usrs["users"][i] != user1){
+        dests[i].setAttribute("value", usrs["mess"][i]);
+        if(usrs["mess"][i] != user1){
             p.appendChild(dests[i]);
-            p.appendChild(document.createTextNode(" "+usrs["all"][i]));
+            p.appendChild(document.createTextNode(" "+usrs["mess"][i]));
             div.appendChild(p);
         }
     }

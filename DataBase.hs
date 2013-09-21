@@ -16,6 +16,7 @@ Devices
     user Text
     password Text
     identifier Device
+    isConnect4 Bool
     UniqueUser user
     UniqueDevice identifier
     deriving Show

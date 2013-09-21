@@ -44,7 +44,8 @@ staticFiles "static"
 data Messages = Messages {
                             connectionPool :: ConnectionPool -- Connection to the Database.
                          ,  getStatic      :: Static         -- Reference point of the static data.
-                         ,  pushManager    :: PushManager
+                         ,  pushManager1   :: PushManager
+                         ,  pushManager2   :: PushManager
                          ,  httpManager    :: Manager
                          ,  onlineUsers    :: IORef WebUsers
                          ,  theApproot     :: Text
@@ -60,7 +61,7 @@ mkYesod "Messages" [parseRoutes|
 /apps AppsR GET
 /fromweb FromWebR POST
 /receive ReceiveR GET
-/fromdevices PushManagerR PushManager pushManager
+/fromdevices PushManagerR PushManager pushManager1
 /getusers GetUsersR GET
 /static StaticR Static getStatic
 /auth AuthR Auth getAuth
@@ -106,7 +107,7 @@ instance YesodAuth Messages where
 instance YesodPersist Messages where
     type YesodPersistBackend Messages = SqlPersistT
     runDB action = do
-        Messages pool _ _ _ _ _ <- getYesod
+        Messages pool _ _ _ _ _ _ <- getYesod
         runSqlPool action pool
 
 instance RenderMessage Messages FormMessage where
@@ -117,7 +118,7 @@ instance RenderMessage Messages FormMessage where
 -- This function actualizes the time of the last communication with a web user.
 actualize :: Text -> Handler WebUsers
 actualize user1 = do
-    Messages _ _ _ _ webUsers _ <- getYesod
+    Messages _ _ _ _ _ webUsers _ <- getYesod
     ctime <- liftIO $ getPOSIXTime
     liftIO $ atomicModifyIORef webUsers (\s -> 
         case getClient user1 s of
@@ -131,7 +132,7 @@ postFromWebR = do
     case maid of
       Nothing    -> redirect $ AuthR LoginR
       Just user1 -> do
-          Messages pool _ man _ _ _ <- getYesod
+          Messages pool _ man1 man2 _ _ _ <- getYesod
           list <- actualize user1
           case getClient user1 list of
             Nothing      -> redirect $ AuthR LoginR
@@ -141,7 +142,7 @@ postFromWebR = do
                 case m >>= readMaybe . unpack of
                   Just msg -> do
                                 $(logInfo) . pack $ "New parsed Message : " ++ show msg
-                                liftIO $ handleMessage pool list man (Web id1) user1 msg
+                                liftIO $ handleMessage pool list man1 man2 (Web id1) user1 msg
                   _ -> return ()
                 redirect RootR
 
@@ -152,7 +153,7 @@ getReceiveR = do
     case maid of
       Nothing    -> return ()
       Just user1 -> do
-          Messages _ _ _ _ webRef _ <- getYesod
+          Messages _ _ _ _ _ webRef _ <- getYesod
           webUsers <- liftIO $ readIORef webRef
           case getClient user1 webUsers of
             Nothing -> sendResponse $ RepJson $ toContent $ object [] 
@@ -171,7 +172,7 @@ getRootR = do
     case maid of
       Nothing -> redirect $ AuthR LoginR
       Just user1 -> do
-          Messages _ _ _ _ webRef _ <- getYesod
+          Messages _ _ _ _ _ webRef _ <- getYesod
           webUsers <- liftIO $ readIORef webRef
           case getClient user1 webUsers of
             Nothing     -> do
@@ -211,18 +212,20 @@ getAppsR = defaultLayout $(widgetFile "Apps")
 
 getFreelist :: Handler ([Text],[Text])
 getFreelist = do
-    list  <- (runDB $ selectList [] [Desc DevicesUser])
-    Messages _ _ _ _ refUsers _ <- getYesod
-    l <- liftIO $ readIORef refUsers
-    let all1  = map (\a -> devicesUser(entityVal a)) list
-        all2  = getClients l
-        all   = all1 ++ all2
-        list1 = (map (\a -> devicesUser(entityVal a)) . filter (\a -> isMPNS $ devicesIdentifier (entityVal a))) list
-    list2 <- (runDB $ selectList [] [Desc GamesUser1]) >>= return . map (\a -> gamesUser1(entityVal a))
-    list3 <- (runDB $ selectList [] [Desc GamesUser2]) >>= return . map (\a -> gamesUser2(entityVal a))
-    return $ (((all \\ list1) \\ list2) \\ list3,all)
-      where isMPNS (MPNS _) = True
-            isMPNS _        = False
+    messageslist <- (runDB $ selectList [DevicesIsConnect4 ==. False] [Desc DevicesUser])
+                    >>= return . map (\a -> devicesUser(entityVal a))
+    connect4list <- (runDB $ selectList [DevicesIsConnect4 ==. True ] [Desc DevicesUser])
+                    >>= return . map (\a -> devicesUser(entityVal a))
+    Messages _ _ _ _ _ refUsers _ <- getYesod
+    webList <- liftIO $ readIORef refUsers
+                        >>= return . getClients
+    playinglist1 <- runDB (selectList [] [Desc GamesUser1])
+                    >>= return . map (\a -> gamesUser1(entityVal a))
+    playinglist2 <- runDB (selectList [] [Desc GamesUser2])
+                    >>= return . map (\a -> gamesUser2(entityVal a))
+    let mList = messageslist ++ webList
+        mCon4 = ((connect4list ++ webList) \\ playinglist1) \\ playinglist2
+    return (mCon4,mList)
 
 -- 'getGetUsersR' provides the list of users that are available to play ("users"), and the complete list ("all").
 getGetUsersR :: Handler RepJson
@@ -231,10 +234,10 @@ getGetUsersR = do
     case maid of
       Just user1 -> actualize user1 >> return ()
       Nothing -> return () 
-    (freeList,all) <- getFreelist
-    sendResponse $ toTypedContent $ object ["users" .= array freeList , "all" .= array all]
+    (con4List,messList) <- getFreelist
+    sendResponse $ toTypedContent $ object ["con4" .= array con4List , "mess" .= array messList]
 
-connStr = "host=url dbname=dbname user=usr password=pass port=5432"
+connStr = "host= user= password= port="
 
 main :: IO ()
 main = do
@@ -244,27 +247,28 @@ main = do
      liftIO $ do
       ref <- newIORef Nothing
       onlineUsers <- newIORef newWebUsersState
-      man <- startPushService $ PushServiceConfig{
-            pushConfig           = def{ gcmConfig  = Just $ Http $ def{apiKey = "apikey"}
-                                   ,    mpnsConfig = Just def
-                                   }
+      man1 <- startPushService $ PushServiceConfig{
+            pushConfig           = def{ gcmConfig  = Just $ Http $ def{apiKey = "api key for connect 4 app"} }
         ,   newMessageCallback   = handleNewMessage pool onlineUsers ref
         ,   newDeviceCallback    = handleNewDevice pool
         ,   unRegisteredCallback = handleUnregistered pool
         ,   newIdCallback        = handleNewId pool
         }
+      man2 <- startPushService $ def{
+            pushConfig  = def{ gcmConfig  = Just $ Http $ def{apiKey = "apikey for messaging app"}
+                                      , mpnsConfig = Just def } }
       m <- newManager def
-      forkIO $ checker onlineUsers man pool
-      writeIORef ref $ Just man
+      forkIO $ checker onlineUsers man1 man2 pool
+      writeIORef ref $ Just (man1,man2)
       static@(Static settings) <- static "static"
-      warpEnv $ Messages pool static man m onlineUsers $ pack ar
+      warpEnv $ Messages pool static man1 man2 m onlineUsers $ pack ar
 
 limit :: POSIXTime
 limit = 240
 
 -- 'checker' checks every 30 seconds the webUsers list and removes inactive users.
-checker :: IORef WebUsers -> PushManager -> ConnectionPool -> IO ()
-checker onlineUsers man pool = do
+checker :: IORef WebUsers -> PushManager -> PushManager -> ConnectionPool -> IO ()
+checker onlineUsers man1 man2 pool = do
                         ctime <- getPOSIXTime
                         (r,c,s) <- atomicModifyIORef onlineUsers (\s ->
                             let rem = filterClients (\(c,t) -> (ctime - t) > limit) s
@@ -273,7 +277,6 @@ checker onlineUsers man pool = do
                                 s' = filterClients (\(c,t) -> (ctime - t) <= limit) s
                             in (s', (names,chans,s)) )
                         putStrLn $ "Remove: " ++ show r
-                        mapM_ (\(us,(ch,_)) -> handleMessage pool s man (Web ch) us Cancel) $ zip r c
+                        mapM_ (\(us,(ch,_)) -> handleMessage pool s man1 man2 (Web ch) us Cancel) $ zip r c
                         threadDelay 30000000
-                        checker onlineUsers man pool
-
+                        checker onlineUsers man1 man2 pool

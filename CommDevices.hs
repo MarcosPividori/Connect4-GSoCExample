@@ -13,6 +13,7 @@ import Data.Aeson.Types
 import Data.Conduit.Pool
 import Data.Default
 import Data.IORef
+import Data.Maybe
 import Data.Text                      (Text,pack,unpack,empty)
 import qualified Data.HashMap.Strict  as HM
 import Control.Applicative
@@ -27,10 +28,11 @@ import Extra
 import Handlers
 
 
-pars :: Value -> Parser (Text,Text)
-pars (Object v) = (,) <$>
-                  v .: "user" <*>
-                  v .: "password"
+pars :: Value -> Parser (Text,Text,Maybe Text)
+pars (Object v) = (,,) <$>
+                  v .:  "user" <*>
+                  v .:  "password" <*>
+                  v .:? "isConnect4"
 pars _          = mzero
 
 runDBAct p a = runResourceT . runNoLoggingT $ runSqlPool a p
@@ -39,8 +41,8 @@ handleNewDevice :: Pool Connection -> Device -> Value -> IO RegisterResult
 handleNewDevice pool d v = do
    res  <- return $ parseMaybe pars v
    case res of
-     Nothing         -> return $ ErrorReg "No User or Password"
-     Just (usr,pass) -> do
+     Nothing                -> return $ ErrorReg "No User or Password"
+     Just (usr,pass,isCon4) -> do
          putStr ("\nIntent for a new user!:\n-User: " ++ show usr ++ "\n-Password: "
                  ++ show pass ++ "\n-Identifier: " ++ show d ++ "\n")
          device <- runDBAct pool $ getBy $ UniqueUser usr
@@ -52,9 +54,11 @@ handleNewDevice pool d v = do
                      runDBAct pool $ update (entityKey (x)) [DevicesUser =. usr , DevicesPassword =. pass]
                      return SuccessfulReg
                  Nothing -> do
-                     runDBAct pool $ insert $ Devices usr pass d
+                     case isCon4 of
+                       Nothing -> runDBAct pool $ insert $ Devices usr pass d False
+                       Just _  -> runDBAct pool $ insert $ Devices usr pass d True
                      return SuccessfulReg
-           Just a  -> case devicesPassword (entityVal (a)) == pass of
+           Just a  -> case devicesPassword (entityVal (a)) == pass && isJust isCon4 == devicesIsConnect4 (entityVal (a)) of
                         True  -> do
                             runDBAct pool $ update (entityKey (a)) [DevicesIdentifier =. d]
                             return SuccessfulReg
@@ -70,11 +74,11 @@ handleNewId pool (old,new) = do
 handleUnregistered :: Pool Connection -> Device -> IO ()
 handleUnregistered pool d = runDBAct pool $ deleteBy $ UniqueDevice d
 
-handleNewMessage :: Pool Connection -> IORef WebUsers -> IORef (Maybe PushManager) -> Device -> Value -> IO ()
+handleNewMessage :: Pool Connection -> IORef WebUsers -> IORef (Maybe (PushManager,PushManager)) -> Device -> Value -> IO ()
 handleNewMessage pool webRef ref d v = do
-   Just man <- readIORef ref
-   res      <- return $ parseMaybe pars v
-   isUser   <- authenticate res
+   Just (man1,man2) <- readIORef ref
+   res    <- return $ parseMaybe pars v
+   isUser <- authenticate res
    case isUser of 
      Nothing  -> return ()
      Just usr -> do--Authenticated!
@@ -83,10 +87,10 @@ handleNewMessage pool webRef ref d v = do
            Nothing -> return ()
            Just m2 -> do
                webUsers <- readIORef webRef
-               handleMessage pool webUsers man (Dev d) usr m2
+               handleMessage pool webUsers man1 man2 (Dev d) usr m2
    where
        authenticate Nothing           = return Nothing
-       authenticate (Just (usr,pass)) = do
+       authenticate (Just (usr,pass,_)) = do
            device <- runDBAct pool $ getBy $ UniqueUser usr
            case device of
              Nothing -> return Nothing

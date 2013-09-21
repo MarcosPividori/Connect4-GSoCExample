@@ -74,8 +74,8 @@ setMsg _ (Just a) _ _ = Movement ((read $ unpack a) :: Int)
 setMsg _ _ (Just a) _ = NewGame a
 setMsg _ _ _ (Just a) = NewMessage "" a
 
-handleMessage :: Pool Connection -> WebUsers -> PushManager -> Identifier -> Text -> MsgFromPlayer -> IO ()
-handleMessage pool webUsers man id1 user1 msg = do
+handleMessage :: Pool Connection -> WebUsers -> PushManager -> PushManager -> Identifier -> Text -> MsgFromPlayer -> IO ()
+handleMessage pool webUsers man1 man2 id1 user1 msg = do
     case msg of
       Cancel       -> do--Cancel
           mId2 <- getOpponentId user1
@@ -136,6 +136,9 @@ handleMessage pool webUsers man id1 user1 msg = do
                                              atomically $ writeTChan chan msg
                                Dev d    -> do
                                              putStrLn $ "Sending on PushServer: " ++ show msg
+                                             let man = case msg of 
+                                                         NewMessage _ _ -> man2
+                                                         _              -> man1
                                              res <- sendPush man (getPushNotif $ setMessageValue msg) (HS.singleton d)
                                              if HM.null (failed res)
                                               then return ()

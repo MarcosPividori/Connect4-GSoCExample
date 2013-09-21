@@ -1,13 +1,13 @@
 <div id="users">
     <p><b>Android Apps:</b>
-       <p> There are 2 test examples, but you shouldn't install both at the same time, because they share the Project ID. 
-           So, before installing it, be sure you have unistalled any previously installed app.
+       <p> There are 2 test examples, you can't use the same username for both.
        <p> To install:
            <ul> 
                <li> Go to settings/applications/ allow unknown sources.
                <li> In the web browser click on the app link, to start downloading.
                <li> Install it, enter a new username and a password.
-               <li> If your device doesn't support CCS, you should disable it on settings tab.
+               <li> Actual hosting doesn't support CCS, so you shouldn't enable it on settings tab.
+                    It is just a example on how you could use CCS.
        <p> Apps available:
            <ul>
                <li> <a href=@{StaticR _Connect4_apk}> Connect 4 </a>
