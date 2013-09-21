@@ -1,6 +1,6 @@
 <div id="users">
     <p><b>Android Apps:</b>
-       <p> There are 2 test examples, but you shouldn't install both at the same time, because they share the Project ID.
+       <p> There are 2 test examples, but you shouldn't install both at the same time, because they share the Project ID. 
            So, before installing it, be sure you have unistalled any previously installed app.
        <p> To install:
            <ul> 
@@ -11,7 +11,7 @@
        <p> Apps available:
            <ul>
                <li> <a href=@{StaticR _Connect4_apk}> Connect 4 </a>
-               <li> <a href=@{StaticR empty_png}> BackAndForth Messaging </a>
+               <li> <a href=@{StaticR _BackAndForth_apk}> BackAndForth Messaging </a>
 
     <p><b>WPhone Apps: </b>
         Comming soon!
