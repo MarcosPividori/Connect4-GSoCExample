@@ -33,7 +33,7 @@ modules:
   CommWebUsers:
     filename: CommWebUsers.hs
   Network.PushNotify.Gcm:
-    filename: Network/PushNotify/Gcm.hs
+    filename: src/Network/PushNotify/Gcm.hs
   Network.PushNotify.Gcm.Send:
     filename: Network/PushNotify/Gcm/Send.hs
   Extra:

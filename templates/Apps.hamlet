@@ -1,15 +1,23 @@
 <div id="users">
     <p><b>Android Apps:</b>
-       There are 2 test examples, but you shouldn't install both at the same time, because they share the Project ID.
-       So, before installing it, be sure you have unistalled any previously installed app.
-       <ul>
-            <li> Connect 4: <a href=@{StaticR empty_png}> link
-            <li> BackAndForth Messaging: <a href=@{StaticR empty_png}> link
+       <p> There are 2 test examples, but you shouldn't install both at the same time, because they share the Project ID.
+           So, before installing it, be sure you have unistalled any previously installed app.
+       <p> To install:
+           <ul> 
+               <li> Go to settings/applications/ allow unknown sources.
+               <li> In the web browser click on the app link, to start downloading.
+               <li> Install it, enter a new username and a password.
+               <li> If your device doesn't support CCS, you should disable it on settings tab.
+       <p> Apps available:
+           <ul>
+               <li> <a href=@{StaticR _Connect4_apk}> Connect 4 </a>
+               <li> <a href=@{StaticR empty_png}> BackAndForth Messaging </a>
 
-    <p><b>WPhone Apps:</b>
+    <p><b>WPhone Apps: </b>
+        Comming soon!
        <ul>
-            <li> BackAndForth Messaging: <a href=@{StaticR empty_png}> link
+            <li> <a href=@{StaticR empty_png}> BackAndForth Messaging </a>
 
-    <p> Source code available on GitHub: <a href="http://github.com/MarcosPividori/GSoC-Communicating-with-mobile-devices/tree/master/test"> link
-    <p> For more information: <a href="http://gsoc2013cwithmobiledevices.blogspot.com.ar"> blog
-    <p> <a href=@{RootR}> Go home site!
+    <p> <b>Source code available on: </b><a href="http://github.com/MarcosPividori/GSoC-Communicating-with-mobile-devices/tree/master/test"> GitHub </a>
+    <p> <b>For more information: </b><a href="http://gsoc2013cwithmobiledevices.blogspot.com.ar"> blog </a>
+    <p> <a href=@{RootR}> Go home site! </a>

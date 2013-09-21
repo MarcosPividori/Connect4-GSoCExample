@@ -3,6 +3,8 @@ html
     background-color: #000000
     font-size: 16px
     height: 100%
+    min-width: 800px
+    min-height: 500px
 
 body
     height: 100%
@@ -10,6 +12,7 @@ body
 
 div#main 
     width: 95%
+    min-width: 500px
     margin: 5% auto 0px auto
     padding: 20px
     background-color: #fff
@@ -53,7 +56,7 @@ div#authid a
     color: #fff
 
 div#users
-    height: 100%
+    height: 95%
     width: 70%
     display: block
     margin-left: auto
@@ -106,10 +109,12 @@ div#deployment a
     color:#0174DF
 
 div#appsLink
-    width: 70%
+    height: 5%
+    width: auto
     display: block
     margin-left: auto
     margin-right: auto
+    text-align: center
 
 #alertBox
     position:absolute

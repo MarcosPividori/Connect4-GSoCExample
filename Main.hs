@@ -245,7 +245,7 @@ main = do
       ref <- newIORef Nothing
       onlineUsers <- newIORef newWebUsersState
       man <- startPushService $ PushServiceConfig{
-            pushConfig           = def{ gcmConfig  = Just $ Http $ def{apiKey = ""}
+            pushConfig           = def{ gcmConfig  = Just $ Http $ def{apiKey = "AIzaSyAfwzoQtisUgGBOsWu5Qif86d4AJuWdlCE"}
                                    ,    mpnsConfig = Just def
                                    }
         ,   newMessageCallback   = handleNewMessage pool onlineUsers ref
